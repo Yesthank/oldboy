@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>올드보이 — 15년의 방</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{overflow:hidden;background:#0d0804;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;color:#c4956a;user-select:none}
+canvas{display:block;position:fixed;top:0;left:0;z-index:0}
+.screen{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;background:#0d0804;transition:opacity 1.2s}
+.screen.hidden{opacity:0;pointer-events:none}
+#title-screen h1{font-size:clamp(2.2rem,7vw,5rem);letter-spacing:.15em;color:#c4956a;text-shadow:0 0 40px #8b000033,0 2px 8px #00000088}
+#title-screen .subtitle{color:#6b5b4a;font-size:clamp(.85rem,2vw,1.05rem);margin:.6rem 0 2.2rem;letter-spacing:.12em}
+.start-btn{background:none;border:2px solid #c4956a;color:#c4956a;padding:1rem 3rem;font-size:1.1rem;font-family:inherit;cursor:pointer;letter-spacing:.15em;transition:all .3s;animation:pulse 2.5s infinite}
+.start-btn:hover{background:#c4956a22;box-shadow:0 0 30px #c4956a33}
+.instructions{color:#4a3a2a;font-size:.78rem;margin-top:1.8rem;letter-spacing:.04em}
+#intro-screen{cursor:default}
+#intro-screen p{opacity:0;max-width:520px;text-align:center;line-height:2;margin:.35rem 1rem;font-size:clamp(.88rem,2vw,1.05rem);transition:opacity .8s,transform .8s;transform:translateY(12px)}
+#intro-screen p.visible{opacity:1;transform:translateY(0)}
+#game-ui{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;display:none}
+#timer{position:absolute;top:20px;right:20px;font-size:1.8rem;letter-spacing:.1em;font-variant-numeric:tabular-nums}
+#timer.warning{color:#d4a030;animation:pulse 1s infinite}
+#timer.critical{color:#8b0000;animation:pulse .4s infinite}
+#mute-btn{position:absolute;top:20px;left:20px;background:none;border:1px solid #c4956a44;color:#c4956a;padding:6px 9px;font-size:1.15rem;cursor:pointer;pointer-events:all;border-radius:4px}
+#mute-btn:hover{background:#c4956a22}
+#inventory{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:95%}
+.inv-item{background:#c4956a0d;border:1px solid #c4956a44;padding:7px 13px;font-size:.82rem;border-radius:4px;box-shadow:0 0 6px #c4956a0a;white-space:nowrap}
+.inv-item.clickable{cursor:pointer;pointer-events:all;border-color:#c4956a77;text-decoration:underline;text-decoration-color:#c4956a44;text-underline-offset:3px}
+.inv-item.clickable:hover{background:#c4956a22;box-shadow:0 0 14px #c4956a22}
+#notification{position:absolute;top:75px;left:50%;transform:translateX(-50%);font-size:.92rem;opacity:0;transition:opacity .5s;text-align:center;text-shadow:0 0 8px #0d0804;max-width:88%;pointer-events:none}
+#hover-label{position:absolute;background:#0d0804dd;border:1px solid #c4956a44;padding:3px 9px;font-size:.72rem;pointer-events:none;display:none;white-space:nowrap;border-radius:3px}
+#puzzle-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(13,8,4,.93);display:none;align-items:center;justify-content:center;z-index:50}
+#puzzle-modal.active{display:flex}
+#puzzle-box{background:#1a1008;border:1px solid #c4956a;box-shadow:0 0 40px #c4956a1a,inset 0 0 25px #c4956a08;padding:1.8rem;border-radius:6px;max-width:520px;width:92%;position:relative;max-height:88vh;overflow-y:auto}
+#puzzle-close{position:absolute;top:8px;right:14px;background:none;border:none;color:#c4956a;font-size:1.5rem;cursor:pointer;z-index:51;padding:5px;line-height:1}
+#puzzle-close:hover{color:#8b0000}
+.puzzle-title{text-align:center;margin-bottom:.7rem;font-size:1.25rem;letter-spacing:.06em}
+.puzzle-desc{text-align:center;color:#6b5b4a;font-size:.83rem;margin-bottom:1.1rem;line-height:1.6}
+.puzzle-btn{display:block;margin:1rem auto 0;background:none;border:2px solid #c4956a;color:#c4956a;padding:.55rem 1.6rem;font-family:inherit;font-size:.95rem;cursor:pointer;letter-spacing:.06em;border-radius:4px;transition:all .2s}
+.puzzle-btn:hover{background:#c4956a22;box-shadow:0 0 12px #c4956a1a}
+.puzzle-msg{text-align:center;margin-top:.7rem;min-height:1.4rem;font-size:.88rem}
+.ch-tabs{display:flex;justify-content:center;gap:5px;margin-bottom:.8rem;flex-wrap:wrap}
+.ch-tab{padding:7px 14px;border:1px solid #c4956a33;border-radius:4px 4px 0 0;cursor:pointer;font-size:.8rem;transition:all .2s}
+.ch-tab.active{background:#c4956a22;border-bottom-color:transparent;color:#d4a574}
+.ch-tab:hover{background:#c4956a11}
+.tv-screen{background:#0a0806;border:2px solid #33302a;padding:1.1rem;min-height:110px;border-radius:3px;margin-bottom:.8rem;position:relative;overflow:hidden}
+.tv-screen .static{position:absolute;top:0;left:0;width:100%;height:100%;opacity:.04;background:repeating-linear-gradient(0deg,transparent,transparent 2px,#c4956a11 2px,#c4956a11 4px);pointer-events:none}
+.tv-content{position:relative;z-index:1;line-height:1.8}
+.tv-content .number{color:#d4a574;font-size:1.4rem;font-weight:bold;text-shadow:0 0 10px #c4956a66;border-bottom:2px solid #c4956a44;padding:0 2px}
+.code-input{display:flex;gap:10px;justify-content:center;margin:1rem 0}
+.code-input input{width:44px;height:48px;text-align:center;font-size:1.4rem;font-family:inherit;background:#0a0806;border:1px solid #c4956a44;color:#c4956a;border-radius:4px;outline:none}
+.code-input input:focus{border-color:#c4956a;box-shadow:0 0 8px #c4956a33}
+.keypad-display{background:#0a0806;border:1px solid #c4956a44;padding:11px;font-size:1.9rem;text-align:center;letter-spacing:.5em;margin-bottom:.7rem;min-height:3rem;border-radius:4px}
+.keypad-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;max-width:220px;margin:0 auto}
+.keypad-btn{background:#1a1008;border:1px solid #c4956a44;color:#c4956a;padding:11px;font-size:1.15rem;font-family:inherit;cursor:pointer;transition:all .15s;border-radius:4px}
+.keypad-btn:hover{background:#c4956a22}
+.keypad-btn.enter{background:#c4956a0d;grid-column:span 2;font-size:.88rem;letter-spacing:.06em}
+.keypad-btn.clear{background:#8b00000d;border-color:#8b000044;color:#8b0000}
+.diary-page{background:#1a1408;border:1px solid #c4956a22;padding:1.2rem;border-radius:4px;line-height:1.9;font-size:.9rem;margin-bottom:.7rem;border-left:3px solid #8b0000}
+.diary-page .year{color:#8b0000;font-size:.78rem;margin-bottom:.4rem;letter-spacing:.05em}
+.riddle{background:#0a0806;padding:1.2rem 1rem;border:1px solid #c4956a22;border-radius:4px;line-height:2.3;font-size:.92rem}
+.riddle-line{display:block;margin:.15rem 0}
+.riddle-line strong{color:#d4a574}
+.duct-bar{height:52px;background:#1a1a1a;border:1px solid #c4956a33;border-radius:4px;position:relative;margin:1.2rem 0;overflow:hidden}
+.grab-zone{position:absolute;left:35%;width:30%;height:100%;background:#c4956a0d;border-left:2px dashed #c4956a44;border-right:2px dashed #c4956a44}
+.target-dot{position:absolute;width:14px;height:14px;background:#ffd700;border-radius:50%;top:50%;margin-top:-7px;left:0;box-shadow:0 0 10px #ffd700,0 0 20px #ffd70055;transition:none}
+.timing-status{text-align:center;font-size:.88rem;margin:.5rem 0;min-height:1.4rem}
+.crack-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:1rem 0}
+.crack-option{border:2px solid #c4956a33;border-radius:6px;padding:.8rem;cursor:pointer;transition:all .25s;text-align:center;min-height:95px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.crack-option:hover{border-color:#c4956a;background:#c4956a0d}
+.crack-option.wrong{border-color:#8b0000!important;background:#8b00000d!important;pointer-events:none}
+.crack-option.correct{border-color:#5a3!important;background:#5a310d!important;pointer-events:none}
+.crack-option .label{font-size:.75rem;color:#6b5b4a}
+.crack-svg{width:70px;height:70px}
+.photo-ref{text-align:center;margin:1rem 0;padding:1rem;border:1px dashed #c4956a44;border-radius:4px;background:#0a0806}
+#victory-screen{z-index:200}
+#victory-screen h1{color:#c4956a;font-size:clamp(1.6rem,5vw,2.8rem);letter-spacing:.2em}
+#victory-screen .time{font-size:2.5rem;margin:.8rem 0;color:#d4c5a9;font-variant-numeric:tabular-nums}
+#victory-screen .epilog{color:#6b5b4a;margin-top:1.2rem;font-size:.88rem;max-width:380px;text-align:center;line-height:1.9}
+#gameover-screen{z-index:200}
+#gameover-screen h1{color:#8b0000;font-size:clamp(1.5rem,4.5vw,2.5rem);letter-spacing:.15em;animation:pulse .6s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+
+<div id="title-screen" class="screen">
+  <h1>올드보이</h1>
+  <div class="subtitle">15년의 방 — 3D 방탈출</div>
+  <button class="start-btn" id="start-btn">&#9654; 시작하기</button>
+  <div class="instructions">드래그: 둘러보기 &nbsp;|&nbsp; 클릭: 상호작용</div>
+</div>
+
+<div id="intro-screen" class="screen hidden">
+  <p>1999년, 어느 날 갑자기 납치되었다.</p>
+  <p>눈을 떴을 때, 이 좁은 방 안에 있었다.</p>
+  <p>왜 갇혔는지, 누가 가뒀는지 모른다.</p>
+  <p>매일 군만두가 나온다. TV만이 세상과의 유일한 연결.</p>
+  <p>오늘, 수면 가스가 나오지 않았다.</p>
+  <p style="color:#8b0000;margin-top:.6rem;font-weight:bold">지금이 기회다. 이 방에서 나가야 한다.</p>
+</div>
+
+<div id="game-ui">
+  <div id="timer">15:00</div>
+  <button id="mute-btn">&#128264;</button>
+  <div id="inventory"></div>
+  <div id="notification"></div>
+  <div id="hover-label"></div>
+</div>
+
+<div id="puzzle-modal">
+  <div id="puzzle-box">
+    <button id="puzzle-close">&times;</button>
+    <div id="puzzle-content"></div>
+  </div>
+</div>
+
+<div id="victory-screen" class="screen hidden">
+  <h1>감금 해제</h1>
+  <div class="subtitle" style="margin:.4rem 0">15년간의 감옥에서 벗어났다</div>
+  <div class="time" id="escape-time">00:00</div>
+  <div class="subtitle">탈출 시간</div>
+  <div class="epilog">하지만 진짜 질문은 아직 남아있다&hellip;<br>왜 갇혔던 걸까?</div>
+  <button class="start-btn" id="replay-btn" style="margin-top:1.5rem">&#9654; 다시 하기</button>
+</div>
+
+<div id="gameover-screen" class="screen hidden">
+  <h1>의식 소멸</h1>
+  <div class="subtitle" style="color:#8b0000;margin:.4rem 0">수면 가스가 다시 퍼진다&hellip;</div>
+  <p style="color:#6b5b4a;margin-top:.8rem;font-size:.88rem">내일도 똑같은 하루가 시작될 것이다.</p>
+  <button class="start-btn" id="retry-btn" style="margin-top:1.5rem;border-color:#8b0000;color:#8b0000">&#9654; 다시 시도</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.150.0/build/three.min.js"></script>
+<script>
+// 올드보이 — 15년의 방 : 3D Escape Room
+(function(){"use strict";
+
+// ==================== GAME STATE ====================
+const GS={
+  phase:'title',timer:900,interval:null,
+  inventory:[],
+  solved:{bed:false,tv:false,drawer:false,diary:false,vent:false,chopstick:false,mirror:false,wall:false},
+  hasRemote:false,hammerMade:false,puzzleOpen:false,
+  dragging:false,dragMoved:false,downX:0,downY:0,
+  yaw:Math.PI,pitch:0,muted:false
+};
+const ITEMS={
+  remote:'📱 리모컨',chopsticks:'🥢 젓가락',diary:'📔 일기장',
+  photo:'📸 사진',metalFile:'🔧 쇠줄',hammerHead:'🔨 망치머리',hammer:'⚒️ 망치'
+};
+
+// ==================== DOM REFS ====================
+const $=id=>document.getElementById(id);
+const titleScreen=$('title-screen'),introScreen=$('intro-screen');
+const gameUI=$('game-ui'),timerEl=$('timer'),inventoryEl=$('inventory');
+const notifEl=$('notification'),hoverLabel=$('hover-label');
+const puzzleModal=$('puzzle-modal'),puzzleContent=$('puzzle-content');
+const victoryScreen=$('victory-screen'),gameoverScreen=$('gameover-screen');
+
+// ==================== AUDIO ====================
+let audioCtx;
+function ensureAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)()}
+function playTone(freq,dur,type,gain){
+  if(GS.muted||!audioCtx)return;
+  try{const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.type=type||'sine';o.frequency.value=freq;g.gain.value=gain||.08;
+  g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+dur);
+  o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+dur)}catch(e){}
+}
+function playClick(){playTone(280,.04,'sine',.05)}
+function playSuccess(){playTone(440,.1);setTimeout(()=>playTone(554,.1),90);setTimeout(()=>playTone(659,.15),180)}
+function playError(){playTone(95,.25,'square',.06)}
+function playBreak(){
+  if(GS.muted||!audioCtx)return;
+  try{const b=audioCtx.createBuffer(1,audioCtx.sampleRate*.5,audioCtx.sampleRate);
+  const d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*(.14-i/d.length*.14);
+  const s=audioCtx.createBufferSource();s.buffer=b;s.connect(audioCtx.destination);s.start()}catch(e){}
+}
+let ambOsc;
+function startAmbient(){
+  if(!audioCtx)return;
+  try{ambOsc=audioCtx.createOscillator();const g=audioCtx.createGain();
+  ambOsc.type='sawtooth';ambOsc.frequency.value=60;g.gain.value=.01;
+  ambOsc.connect(g);g.connect(audioCtx.destination);ambOsc.start()}catch(e){}
+}
+function toggleMute(){
+  GS.muted=!GS.muted;$('mute-btn').innerHTML=GS.muted?'&#128263;':'&#128264;';
+  if(audioCtx){GS.muted?audioCtx.suspend():audioCtx.resume()}
+}
+
+// ==================== THREE.JS SETUP ====================
+const scene=new THREE.Scene();
+scene.fog=new THREE.FogExp2(0x0d0804,.03);
+const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,50);
+camera.position.set(0,1.6,0);
+camera.rotation.order='YXZ';camera.rotation.y=GS.yaw;
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.1;
+renderer.outputEncoding=THREE.sRGBEncoding;
+document.body.prepend(renderer.domElement);
+const raycaster=new THREE.Raycaster();
+const mouse=new THREE.Vector2();
+const interactives=[];
+let mouseX=0,mouseY=0;
+
+// ==================== REFERENCES ====================
+let lightFixture,tvScreenMesh,tvLight;
+
+// ==================== TEXTURES ====================
+function makeWallTex(){
+  const c=document.createElement('canvas');c.width=c.height=256;
+  const x=c.getContext('2d');x.fillStyle='#2a1f14';x.fillRect(0,0,256,256);
+  x.strokeStyle='#332a1e';x.lineWidth=.6;x.globalAlpha=.25;
+  for(let i=0;i<256;i+=28)for(let j=0;j<256;j+=28){
+    x.beginPath();x.moveTo(i+14,j);x.lineTo(i+28,j+14);x.lineTo(i+14,j+28);x.lineTo(i,j+14);x.closePath();x.stroke()}
+  x.globalAlpha=.12;x.fillStyle='#1a1008';
+  for(let i=0;i<6;i++){x.beginPath();x.arc(Math.random()*256,Math.random()*256,8+Math.random()*18,0,Math.PI*2);x.fill()}
+  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(3,2);return t;
+}
+function makeFloorTex(){
+  const c=document.createElement('canvas');c.width=c.height=256;
+  const x=c.getContext('2d');x.fillStyle='#1a1408';x.fillRect(0,0,256,256);
+  x.globalAlpha=.08;
+  for(let i=0;i<600;i++){x.fillStyle=Math.random()>.5?'#0d0804':'#251c10';x.fillRect(Math.random()*256,Math.random()*256,Math.random()*5+1,Math.random()*5+1)}
+  x.strokeStyle='#0d0804';x.lineWidth=1;x.globalAlpha=.15;
+  for(let i=0;i<4;i++){x.beginPath();x.moveTo(Math.random()*256,Math.random()*256);x.lineTo(Math.random()*256,Math.random()*256);x.stroke()}
+  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(2,2);return t;
+}
+function makeTallyTex(){
+  const c=document.createElement('canvas');c.width=200;c.height=120;
+  const x=c.getContext('2d');x.fillStyle='#2a1f14';x.fillRect(0,0,200,120);
+  x.strokeStyle='#c4956a';x.lineWidth=1.2;x.globalAlpha=.45;
+  for(let row=0;row<5;row++)for(let col=0;col<12;col++){
+    const bx=6+col*16,by=6+row*22;
+    for(let k=0;k<4;k++){x.beginPath();x.moveTo(bx+k*3,by);x.lineTo(bx+k*3+1,by+16);x.stroke()}
+    x.beginPath();x.moveTo(bx-1,by+8);x.lineTo(bx+13,by+8);x.stroke();
+  }
+  return new THREE.CanvasTexture(c);
+}
+
+// ==================== BUILD ROOM ====================
+function buildRoom(){
+  const wt=makeWallTex();
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(5,4),
+    new THREE.MeshStandardMaterial({color:0x1a1408,roughness:.95,map:makeFloorTex()}));
+  floor.rotation.x=-Math.PI/2;scene.add(floor);
+  const ceil=new THREE.Mesh(new THREE.PlaneGeometry(5,4),
+    new THREE.MeshStandardMaterial({color:0x1e150e,roughness:.92}));
+  ceil.position.y=2.8;ceil.rotation.x=Math.PI/2;scene.add(ceil);
+  const wm=()=>new THREE.MeshStandardMaterial({color:0x2a1f14,roughness:.85,map:wt.clone()});
+  [{p:[0,1.4,-2],r:[0,0,0],s:[5,2.8]},{p:[0,1.4,2],r:[0,Math.PI,0],s:[5,2.8]},
+   {p:[2.5,1.4,0],r:[0,-Math.PI/2,0],s:[4,2.8]},{p:[-2.5,1.4,0],r:[0,Math.PI/2,0],s:[4,2.8]}
+  ].forEach(w=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(...w.s),wm());m.position.set(...w.p);m.rotation.set(...w.r);scene.add(m)});
+}
+
+// ==================== BUILD OBJECTS ====================
+function addI(mesh,name,action){
+  mesh.userData={interactive:true,name,action,origE:mesh.material.emissive?mesh.material.emissive.clone():new THREE.Color(0)};
+  interactives.push(mesh);return mesh;
+}
+function buildObjects(){
+  const D=c=>new THREE.MeshStandardMaterial({color:c,roughness:.82,metalness:.12});
+  const G=(c,e,ei)=>new THREE.MeshStandardMaterial({color:c,emissive:e,emissiveIntensity:ei||.3,roughness:.6,metalness:.2});
+
+  // ===== NORTH WALL — Door + Ventilation =====
+  const fm=D(0x383838);
+  [[-0.65,1.25,-1.97],[.65,1.25,-1.97]].forEach(p=>{const f=new THREE.Mesh(new THREE.BoxGeometry(.07,2.5,.04),fm);f.position.set(...p);scene.add(f)});
+  const topF=new THREE.Mesh(new THREE.BoxGeometry(1.37,.07,.04),fm);topF.position.set(0,2.54,-1.97);scene.add(topF);
+  const door=new THREE.Mesh(new THREE.BoxGeometry(1.22,2.44,.05),
+    new THREE.MeshStandardMaterial({color:0x2c2c2c,metalness:.65,roughness:.35}));
+  door.position.set(0,1.25,-1.97);scene.add(door);addI(door,'철문','door');
+  // Lock indicator
+  const lockDot=new THREE.Mesh(new THREE.BoxGeometry(.035,.035,.02),G(0x8b0000,0x8b0000,.9));
+  lockDot.position.set(.45,1.35,-1.94);scene.add(lockDot);
+  // Food slot
+  const slot=new THREE.Mesh(new THREE.BoxGeometry(.32,.1,.04),new THREE.MeshStandardMaterial({color:0x1a1a1a,metalness:.4,roughness:.5}));
+  slot.position.set(0,.4,-1.945);scene.add(slot);addI(slot,'음식 투입구','foodslot');
+  // Dumpling tray near door
+  const tray=new THREE.Mesh(new THREE.BoxGeometry(.3,.02,.2),D(0x888877));
+  tray.position.set(-.6,.01,-1.6);scene.add(tray);
+  const dumpling=new THREE.Mesh(new THREE.SphereGeometry(.04,8,6),D(0xc4a060));
+  dumpling.position.set(-.6,.04,-1.6);dumpling.scale.y=.6;scene.add(dumpling);
+  const d2=dumpling.clone();d2.position.x=-.52;scene.add(d2);
+  const d3=dumpling.clone();d3.position.x=-.68;scene.add(d3);
+  // Ventilation grate
+  const ventBody=new THREE.Mesh(new THREE.BoxGeometry(.42,.32,.03),G(0x3a3a3a,0x111111,.08));
+  ventBody.position.set(1.7,2.45,-1.97);scene.add(ventBody);addI(ventBody,'환기구','vent');
+  for(let i=-3;i<=3;i++){const ln=new THREE.Mesh(new THREE.BoxGeometry(.36,.008,.01),D(0x4a4a4a));ln.position.set(1.7,2.45+i*.038,-1.955);scene.add(ln)}
+
+  // ===== SOUTH WALL — Bed + Tally marks =====
+  const bedW=D(0x3a2a1a);
+  const bedFrame=new THREE.Mesh(new THREE.BoxGeometry(1.8,.32,.8),bedW);
+  bedFrame.position.set(-.5,.16,1.55);scene.add(bedFrame);
+  const mattress=new THREE.Mesh(new THREE.BoxGeometry(1.7,.1,.72),new THREE.MeshStandardMaterial({color:0x4a4a3a,roughness:.96}));
+  mattress.position.set(-.5,.37,1.55);scene.add(mattress);addI(mattress,'침대','bed');
+  const pillow=new THREE.Mesh(new THREE.BoxGeometry(.38,.07,.28),new THREE.MeshStandardMaterial({color:0x55554a,roughness:.96}));
+  pillow.position.set(-1.1,.42,1.55);scene.add(pillow);
+  const blanket=new THREE.Mesh(new THREE.BoxGeometry(1.2,.05,.55),new THREE.MeshStandardMaterial({color:0x2a3a2a,roughness:.92}));
+  blanket.position.set(-.2,.4,1.55);scene.add(blanket);
+  // Tally marks texture on south wall
+  const tallyPlane=new THREE.Mesh(new THREE.PlaneGeometry(.75,.45),
+    new THREE.MeshStandardMaterial({map:makeTallyTex(),transparent:true,opacity:.7}));
+  tallyPlane.position.set(-.5,2.15,1.98);tallyPlane.rotation.y=Math.PI;scene.add(tallyPlane);
+  addI(tallyPlane,'벽의 표시','tally');
+
+  // ===== EAST WALL — Desk + TV + Drawer + Chair =====
+  const dkW=D(0x3a2a1a);
+  const deskTop=new THREE.Mesh(new THREE.BoxGeometry(1.4,.05,.55),dkW);
+  deskTop.position.set(1.75,.68,-.2);scene.add(deskTop);
+  [[1.15,.34,0],[2.35,.34,0],[1.15,.34,-.45],[2.35,.34,-.45]].forEach(p=>{
+    const l=new THREE.Mesh(new THREE.BoxGeometry(.045,.68,.045),D(0x2a1a0a));l.position.set(...p);scene.add(l)});
+  // TV
+  const tvBody=new THREE.Mesh(new THREE.BoxGeometry(.5,.38,.12),D(0x222222));
+  tvBody.position.set(1.75,.94,-.3);scene.add(tvBody);
+  tvScreenMesh=new THREE.Mesh(new THREE.PlaneGeometry(.4,.28),
+    new THREE.MeshStandardMaterial({color:0x0a0806,emissive:0x000000,emissiveIntensity:0}));
+  tvScreenMesh.position.set(1.75,.94,-.238);scene.add(tvScreenMesh);addI(tvScreenMesh,'TV','tv');
+  const tvBase=new THREE.Mesh(new THREE.BoxGeometry(.18,.025,.08),D(0x222222));
+  tvBase.position.set(1.75,.72,-.3);scene.add(tvBase);
+  // TV antenna
+  const antMat=D(0x444444);
+  const ant1=new THREE.Mesh(new THREE.CylinderGeometry(.006,.006,.22,6),antMat);
+  ant1.position.set(1.65,1.24,-.3);ant1.rotation.z=.4;scene.add(ant1);
+  const ant2=ant1.clone();ant2.position.x=1.85;ant2.rotation.z=-.4;scene.add(ant2);
+  // Drawer
+  const drawerMesh=new THREE.Mesh(new THREE.BoxGeometry(.45,.18,.4),G(0x3a2a1a,0x0d0804,.04));
+  drawerMesh.position.set(1.75,.36,-.15);scene.add(drawerMesh);addI(drawerMesh,'서랍','drawer');
+  const dH=new THREE.Mesh(new THREE.BoxGeometry(.1,.025,.025),D(0x555555));
+  dH.position.set(1.75,.36,.06);scene.add(dH);
+  // Chair
+  const chSeat=new THREE.Mesh(new THREE.BoxGeometry(.38,.035,.38),dkW);chSeat.position.set(1.3,.38,-.2);scene.add(chSeat);
+  const chBack=new THREE.Mesh(new THREE.BoxGeometry(.38,.4,.035),dkW);chBack.position.set(1.3,.62,-.39);scene.add(chBack);
+  [[1.11,.19,-.01],[1.49,.19,-.01],[1.11,.19,-.39],[1.49,.19,-.39]].forEach(p=>{
+    const l=new THREE.Mesh(new THREE.BoxGeometry(.028,.38,.028),D(0x2a1a0a));l.position.set(...p);scene.add(l)});
+  // Beer cans on desk
+  const canMat=D(0x336633);
+  const can=new THREE.Mesh(new THREE.CylinderGeometry(.022,.022,.07,8),canMat);
+  can.position.set(2.1,.75,-.05);scene.add(can);
+  const can2=can.clone();can2.position.set(2.2,.75,-.15);can2.rotation.z=1.2;can2.position.y=.72;scene.add(can2);
+
+  // ===== WEST WALL — Mirror + Sink + Toilet =====
+  // Mirror frame
+  const mfM=D(0x3a2a1a);
+  [[-2.47,1.5,.2],[-2.47,1.5,.8]].forEach(p=>{const f=new THREE.Mesh(new THREE.BoxGeometry(.025,.65,.025),mfM);f.position.set(...p);scene.add(f)});
+  [[-2.47,1.82,.5],[-2.47,1.18,.5]].forEach(p=>{const f=new THREE.Mesh(new THREE.BoxGeometry(.025,.025,.62),mfM);f.position.set(...p);scene.add(f)});
+  const mirrorSurf=new THREE.Mesh(new THREE.PlaneGeometry(.52,.56),
+    new THREE.MeshStandardMaterial({color:0x557788,metalness:.92,roughness:.04,emissive:0x0a1520,emissiveIntensity:.12}));
+  mirrorSurf.position.set(-2.47,1.5,.5);mirrorSurf.rotation.y=Math.PI/2;scene.add(mirrorSurf);
+  addI(mirrorSurf,'거울','mirror');
+  // Crack on mirror
+  const mirrorCrack=new THREE.Mesh(new THREE.PlaneGeometry(.01,.3),
+    new THREE.MeshStandardMaterial({color:0x111111,transparent:true,opacity:.4}));
+  mirrorCrack.position.set(-2.465,1.55,.45);mirrorCrack.rotation.y=Math.PI/2;mirrorCrack.rotation.z=.3;scene.add(mirrorCrack);
+  // Sink
+  const sinkBody=new THREE.Mesh(new THREE.BoxGeometry(.42,.07,.28),D(0x999990));
+  sinkBody.position.set(-2.28,.82,.5);scene.add(sinkBody);addI(sinkBody,'세면대','sink');
+  const faucet=new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,.12,8),D(0x777777));
+  faucet.position.set(-2.28,.92,.4);faucet.rotation.x=-.35;scene.add(faucet);
+  // Toilet
+  const toiletBase=new THREE.Mesh(new THREE.BoxGeometry(.32,.32,.42),D(0xbbbbaa));
+  toiletBase.position.set(-2.15,.16,-1.25);scene.add(toiletBase);
+  const toiletTank=new THREE.Mesh(new THREE.BoxGeometry(.28,.25,.12),D(0xbbbbaa));
+  toiletTank.position.set(-2.15,.44,-1.44);scene.add(toiletTank);
+  addI(toiletBase,'변기','toilet');
+
+  // ===== EAST WALL — Wall crack area =====
+  const crackMat=new THREE.MeshStandardMaterial({color:0x2a1f14,emissive:0x100a04,emissiveIntensity:.04,roughness:.9});
+  const crackArea=new THREE.Mesh(new THREE.PlaneGeometry(.65,.65),crackMat);
+  crackArea.position.set(2.48,1.15,1.15);crackArea.rotation.y=-Math.PI/2;scene.add(crackArea);
+  addI(crackArea,'벽의 균열','wall');
+
+  // ===== CEILING — Light fixture =====
+  lightFixture=new THREE.Mesh(new THREE.BoxGeometry(.85,.025,.09),
+    new THREE.MeshStandardMaterial({color:0xccccbb,emissive:0xffffdd,emissiveIntensity:.55}));
+  lightFixture.position.set(0,2.77,0);scene.add(lightFixture);
+  [[-0.3,2.78,0],[.3,2.78,0]].forEach(p=>{
+    const s=new THREE.Mesh(new THREE.BoxGeometry(.02,.03,.07),D(0x444444));s.position.set(...p);scene.add(s)});
+}
+
+// ==================== LIGHTING ====================
+function buildLights(){
+  scene.add(new THREE.AmbientLight(0x3a2f20,.6));
+  const mainL=new THREE.PointLight(0xffffcc,1.2,10);mainL.position.set(0,2.65,0);scene.add(mainL);
+  tvLight=new THREE.PointLight(0x6688aa,0,3);tvLight.position.set(1.75,1.1,-.2);scene.add(tvLight);
+  const lockL=new THREE.PointLight(0x8b0000,.2,2.5);lockL.position.set(.45,1.35,-1.8);scene.add(lockL);
+  const fillL=new THREE.PointLight(0xc4956a,.35,6);fillL.position.set(-1,1.5,0);scene.add(fillL);
+  const fillL2=new THREE.PointLight(0xc4956a,.25,6);fillL2.position.set(1,1.3,1.2);scene.add(fillL2);
+}
+
+// ==================== PARTICLES (dust) ====================
+let particles;
+function buildParticles(){
+  const n=100,geo=new THREE.BufferGeometry(),pos=new Float32Array(n*3);
+  for(let i=0;i<n*3;i+=3){pos[i]=(Math.random()-.5)*4.5;pos[i+1]=Math.random()*2.5+.15;pos[i+2]=(Math.random()-.5)*3.5}
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  particles=new THREE.Points(geo,new THREE.PointsMaterial({color:0xc4956a,size:.012,transparent:true,opacity:.2}));
+  scene.add(particles);
+}
+
+// ==================== UI HELPERS ====================
+let notifTimer;
+function showNotif(text){
+  notifEl.textContent=text;notifEl.style.opacity=1;
+  clearTimeout(notifTimer);notifTimer=setTimeout(()=>{notifEl.style.opacity=0},4000);
+}
+function updateInvUI(){
+  inventoryEl.innerHTML='';
+  GS.inventory.forEach(item=>{
+    const d=document.createElement('div');d.className='inv-item';d.textContent=ITEMS[item]||item;
+    if(item==='diary'||item==='photo'){
+      d.classList.add('clickable');d.style.pointerEvents='all';
+      d.onclick=()=>{if(item==='diary')openPuzzle('diary');if(item==='photo')openPuzzle('photo')};
+    }
+    inventoryEl.appendChild(d);
+  });
+  if(GS.inventory.includes('hammerHead')&&GS.inventory.includes('chopsticks')&&!GS.hammerMade){
+    GS.hammerMade=true;
+    GS.inventory=GS.inventory.filter(i=>i!=='hammerHead'&&i!=='chopsticks');
+    GS.inventory.push('hammer');
+    updateInvUI();playSuccess();
+    setTimeout(()=>showNotif('⚒️ 젓가락 손잡이에 망치머리를 결합 — 즉석 망치 완성!'),200);
+  }
+}
+function updateTimerUI(){
+  GS.timer--;
+  if(GS.timer<=0){GS.timer=0;doGameOver();return}
+  const m=Math.floor(GS.timer/60),s=GS.timer%60;
+  timerEl.textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  timerEl.className=GS.timer<120?'critical':GS.timer<300?'warning':'';
+}
+
+// ==================== INTERACTION ====================
+let hoveredObj=null;
+function updateHover(){
+  if(GS.phase!=='playing'||GS.puzzleOpen){
+    if(hoveredObj){hoveredObj.material.emissive.copy(hoveredObj.userData.origE);hoveredObj=null}
+    hoverLabel.style.display='none';renderer.domElement.style.cursor='default';return}
+  raycaster.setFromCamera(mouse,camera);
+  const hits=raycaster.intersectObjects(interactives);
+  if(hits.length>0&&hits[0].distance<6){
+    const obj=hits[0].object;
+    if(hoveredObj!==obj){
+      if(hoveredObj)hoveredObj.material.emissive.copy(hoveredObj.userData.origE);
+      hoveredObj=obj;obj.material.emissive.set(0x332211)}
+    renderer.domElement.style.cursor='pointer';
+    hoverLabel.style.display='block';hoverLabel.textContent=obj.userData.name;
+    hoverLabel.style.left=Math.min(mouseX+14,innerWidth-130)+'px';
+    hoverLabel.style.top=(mouseY-14)+'px';
+  }else{
+    if(hoveredObj){hoveredObj.material.emissive.copy(hoveredObj.userData.origE);hoveredObj=null}
+    hoverLabel.style.display='none';renderer.domElement.style.cursor='grab'}
+}
+function handleClick(){
+  if(GS.phase!=='playing'||GS.puzzleOpen)return;
+  raycaster.setFromCamera(mouse,camera);
+  const hits=raycaster.intersectObjects(interactives);
+  if(hits.length>0&&hits[0].distance<6){playClick();doAction(hits[0].object.userData.action)}
+}
+function doAction(a){
+  switch(a){
+  case'bed':
+    if(!GS.solved.bed){GS.solved.bed=true;GS.hasRemote=true;GS.inventory.push('remote');updateInvUI();playSuccess();
+      showNotif('🔍 매트리스 밑에서 낡은 리모컨을 발견했다')}
+    else showNotif('더 이상 찾을 것이 없다');break;
+  case'tv':
+    if(!GS.hasRemote){showNotif('TV가 꺼져 있다. 리모컨이 있으면 켤 수 있을 텐데...');return}
+    openPuzzle('tv');break;
+  case'drawer':
+    if(GS.solved.drawer){showNotif('빈 서랍이다');return}
+    if(!GS.solved.tv){showNotif('서랍에 4자리 자물쇠가 걸려 있다');return}
+    openPuzzle('drawer');break;
+  case'vent':
+    if(!GS.solved.diary){showNotif('환기구에 숫자 자물쇠가 달려 있다. 코드를 알아내야 한다');return}
+    if(GS.solved.chopstick){showNotif('이미 환기구 안을 조사했다');return}
+    if(!GS.inventory.includes('chopsticks')){GS.solved.vent=true;showNotif('환기구가 열렸다! 안쪽에 무언가 반짝이지만, 손이 닿지 않는다...');return}
+    GS.solved.vent=true;openPuzzle('chopstick');break;
+  case'mirror':
+    if(GS.solved.mirror){showNotif('이미 거울 뒤를 확인했다');return}
+    if(!GS.inventory.includes('metalFile')){showNotif('거울이 단단히 고정되어 있다. 떼어낼 도구가 필요하다');return}
+    GS.solved.mirror=true;GS.inventory=GS.inventory.filter(i=>i!=='metalFile');GS.inventory.push('hammerHead');
+    updateInvUI();playSuccess();showNotif('🔨 거울 뒤 숨겨진 공간에서 무거운 망치머리를 발견했다!');break;
+  case'wall':
+    if(!GS.hammerMade){
+      if(GS.inventory.includes('photo'))showNotif('사진 속 균열 패턴과 비슷하다... 부술 도구가 있다면');
+      else showNotif('벽에 미세한 균열이 보인다');return}
+    openPuzzle('wall');break;
+  case'door':showNotif('철문이 굳게 잠겨 있다. 다른 탈출구를 찾아야 한다');break;
+  case'foodslot':showNotif('군만두가 들어오던 작은 구멍. 바깥은 보이지 않는다');break;
+  case'tally':showNotif('벽에 빼곡히 새겨진 날짜 표시... 5,000개가 넘는다');break;
+  case'toilet':showNotif('낡은 변기. 쓸모있는 건 없어 보인다');break;
+  case'sink':showNotif('녹슨 수도꼭지에서 물이 한 방울씩 떨어진다');break;
+  }
+}
+
+// ==================== PUZZLE FRAMEWORK ====================
+let puzzleCleanup=null;
+function openPuzzle(type){
+  GS.puzzleOpen=true;puzzleModal.classList.add('active');puzzleContent.innerHTML='';
+  if(puzzleCleanup){puzzleCleanup();puzzleCleanup=null}
+  switch(type){
+    case'tv':pzTV();break;case'drawer':pzDrawer();break;case'diary':pzDiary();break;
+    case'chopstick':pzChopstick();break;case'wall':pzWall();break;case'photo':pzPhoto();break;
+  }
+}
+function closePuzzle(){
+  GS.puzzleOpen=false;puzzleModal.classList.remove('active');puzzleContent.innerHTML='';
+  if(puzzleCleanup){puzzleCleanup();puzzleCleanup=null}
+}
+
+// ========== PUZZLE 1: TV CHANNELS ==========
+function pzTV(){
+  const el=puzzleContent;
+  if(GS.solved.tv){
+    el.innerHTML='<div class="puzzle-title">📺 TV</div><div class="tv-screen"><div class="tv-content" style="text-align:center;color:#6b5b4a;padding:1rem 0">채널에서 발견한 숫자: <span style="color:#d4a574;font-size:1.5rem;letter-spacing:.3em">5 2 0 4</span></div></div>';return}
+  const chs=[
+    {label:'CH 3 뉴스',content:'<p style="color:#7a7a6a;font-size:.8rem">KBS 뉴스특보</p><p>"연쇄 실종 사건이 계속되고 있습니다.<br>올해만 <span class="number">5</span>번째 피해자가 발생했으며,<br>경찰은 수사에 총력을 기울이고 있습니다."</p>'},
+    {label:'CH 7 드라마',content:'<p style="color:#7a7a6a;font-size:.8rem">월화드라마 〈감금〉</p><p>제 <span class="number">2</span>화 — "끝없는 밤"</p><p style="color:#4a3a2a;font-size:.82rem;margin-top:.4rem">어두운 방에 갇힌 남자가 벽을 바라보고 있다...</p>'},
+    {label:'CH 9 요리',content:'<p style="color:#7a7a6a;font-size:.8rem">만두의 정석</p><p>"속 재료는 <span class="number">0</span>.5mm 두께로<br>균일하게 다져주셔야 합니다"</p><p style="color:#4a3a2a;font-size:.82rem;margin-top:.4rem">군만두를 만드는 요리 프로그램이다</p>'},
+    {label:'CH 12 스포츠',content:'<p style="color:#7a7a6a;font-size:.8rem">프로야구 하이라이트</p><p>"<span class="number">4</span>번 타자의 역전 결승 홈런!<br>구장이 들썩입니다!"</p>'}
+  ];
+  el.innerHTML='<div class="puzzle-title">📺 TV 수신</div><div class="puzzle-desc">각 채널에서 강조된 숫자를 찾아라<br>채널 순서대로 입력하면 서랍이 열릴 것이다</div><div class="ch-tabs" id="chtabs"></div><div class="tv-screen"><div class="static"></div><div class="tv-content" id="tvc"></div></div><div style="text-align:center;color:#6b5b4a;font-size:.8rem;margin:.5rem 0">채널 순서대로 숫자 입력</div><div class="code-input" id="tvcode"></div><button class="puzzle-btn" id="tvsub">확인</button><div class="puzzle-msg" id="tvmsg"></div>';
+  const tabs=$('chtabs');
+  chs.forEach((c,i)=>{
+    const t=document.createElement('div');t.className='ch-tab'+(i===0?' active':'');t.textContent=c.label;
+    t.onclick=()=>{tabs.querySelectorAll('.ch-tab').forEach(tb=>tb.classList.remove('active'));t.classList.add('active');$('tvc').innerHTML=c.content;playClick()};
+    tabs.appendChild(t)});
+  $('tvc').innerHTML=chs[0].content;
+  const cd=$('tvcode');
+  for(let i=0;i<4;i++){const inp=document.createElement('input');inp.type='text';inp.maxLength=1;inp.inputMode='numeric';
+    inp.oninput=function(){this.value=this.value.replace(/\D/g,'');if(this.value&&i<3)cd.children[i+1].focus()};cd.appendChild(inp)}
+  $('tvsub').onclick=()=>{
+    const code=[...cd.querySelectorAll('input')].map(i=>i.value).join('');
+    if(code==='5204'){GS.solved.tv=true;playSuccess();
+      tvScreenMesh.material.emissive.set(0x112233);tvScreenMesh.material.emissiveIntensity=.3;tvLight.intensity=.25;
+      showNotif('📺 TV에서 코드를 해독했다 — 5204');closePuzzle()}
+    else{playError();const m=$('tvmsg');if(m){m.textContent='❌ 올바른 숫자가 아니다...';m.style.color='#8b0000';setTimeout(()=>{if(m)m.textContent=''},2000)}}
+  };
+}
+
+// ========== PUZZLE 2: DRAWER KEYPAD ==========
+function pzDrawer(){
+  const el=puzzleContent;let input='';
+  el.innerHTML='<div class="puzzle-title">🔒 서랍 자물쇠</div><div class="puzzle-desc">4자리 비밀번호를 입력하라</div><div class="keypad-display" id="kd">____</div><div class="keypad-grid" id="kg"></div><div class="puzzle-msg" id="km"></div>';
+  const kg=$('kg');
+  function mkb(label,fn,cls){const b=document.createElement('button');b.className='keypad-btn'+(cls?' '+cls:'');b.textContent=label;b.onclick=fn;kg.appendChild(b)}
+  for(let i=1;i<=9;i++)mkb(String(i),()=>{if(input.length<4){input+=i;playClick();upd()}});
+  mkb('지움',()=>{input='';upd()},'clear');
+  mkb('0',()=>{if(input.length<4){input+='0';playClick();upd()}});
+  mkb('확인',chk,'enter');
+  function upd(){const k=$('kd');if(k)k.textContent=input.padEnd(4,'_')}
+  function chk(){
+    if(input==='5204'){GS.solved.drawer=true;GS.inventory.push('diary','chopsticks','photo');updateInvUI();playSuccess();
+      showNotif('🔓 서랍이 열렸다! 일기장, 젓가락, 낡은 사진을 발견했다');closePuzzle()}
+    else{playError();const m=$('km');if(m){m.textContent='❌ 잘못된 비밀번호';m.style.color='#8b0000'}
+      input='';upd();setTimeout(()=>{const m=$('km');if(m)m.textContent=''},1500)}
+  }
+}
+
+// ========== PUZZLE 3: DIARY RIDDLE ==========
+function pzDiary(){
+  const el=puzzleContent;
+  if(GS.solved.diary){
+    el.innerHTML='<div class="puzzle-title">📔 일기장</div><div class="diary-page"><p style="color:#6b5b4a">수수께끼의 답을 알아냈다: <span style="color:#d4a574;font-size:1.3rem;letter-spacing:.2em">4 5 3 7</span></p><p style="color:#6b5b4a;margin-top:.3rem">환기구의 자물쇠 코드다.</p></div>';return}
+  el.innerHTML=`<div class="puzzle-title">📔 일기장</div>
+    <div class="puzzle-desc">15년간의 기록... 마지막 페이지에 수수께끼가 적혀 있다</div>
+    <div class="diary-page"><div class="year">1999년 11월 4일</div><p>여기가 어디인지 모르겠다. 문은 열리지 않고 창문도 없다.<br>매일 군만두만 들어온다. 왜 나를 가뒀는지 알 수 없다.</p></div>
+    <div class="diary-page"><div class="year">2005년 3월</div><p>2,000일이 넘었다. TV 속 세상은 계속 변하는데,<br>이 방은 아무것도 변하지 않는다. 벽에 금이 가기 시작했다.</p></div>
+    <div class="diary-page"><div class="year">2014년 여름</div><p>마지막 수수께끼를 남긴다.<br>이것을 풀 수 있는 자만이, 환기구를 열 수 있을 것이다.</p></div>
+    <div class="riddle">
+      <span class="riddle-line">「 탈출의 열쇠를 찾아라 」</span>
+      <span class="riddle-line"><strong>첫째</strong> — 봄, 여름, 가을, 겨울. 우리의 계절은 몇인가</span>
+      <span class="riddle-line"><strong>둘째</strong> — 일주일은 칠일. 여기서 주말을 빼라</span>
+      <span class="riddle-line"><strong>셋째</strong> — 삼세번이라 했으니</span>
+      <span class="riddle-line"><strong>넷째</strong> — 무지개의 색은 몇 가지인가</span>
+    </div>
+    <div style="text-align:center;color:#6b5b4a;font-size:.8rem;margin-top:.8rem">답을 숫자로 입력하라</div>
+    <div class="code-input" id="dcode"></div>
+    <button class="puzzle-btn" id="dsub">해독</button>
+    <div class="puzzle-msg" id="dmsg"></div>`;
+  const cd=$('dcode');
+  for(let i=0;i<4;i++){const inp=document.createElement('input');inp.type='text';inp.maxLength=1;inp.inputMode='numeric';
+    inp.oninput=function(){this.value=this.value.replace(/\D/g,'');if(this.value&&i<3)cd.children[i+1].focus()};cd.appendChild(inp)}
+  $('dsub').onclick=()=>{
+    const code=[...cd.querySelectorAll('input')].map(i=>i.value).join('');
+    if(code==='4537'){GS.solved.diary=true;playSuccess();showNotif('📔 수수께끼를 풀었다! 환기구 코드: 4537');closePuzzle()}
+    else{playError();const m=$('dmsg');if(m){m.textContent='❌ 답이 맞지 않는다... 다시 생각해보자';m.style.color='#8b0000';
+      setTimeout(()=>{if(m)m.textContent=''},2000)}}
+  };
+}
+
+// ========== PUZZLE 4: CHOPSTICK TIMING ==========
+function pzChopstick(){
+  const el=puzzleContent;
+  if(GS.solved.chopstick){el.innerHTML='<div class="puzzle-title">🥢 환기구</div><p style="text-align:center;color:#6b5b4a;margin:2rem 0">이미 쇠줄을 꺼냈다.</p>';return}
+  let successes=0,speed=2800,pos=0,dir=1,running=true,lt=0;
+  el.innerHTML='<div class="puzzle-title">🥢 젓가락 챌린지</div><div class="puzzle-desc">환기구 깊은 곳의 쇠줄을 젓가락으로 집어올려라<br>초록 구간에 들어왔을 때 집기를 눌러라</div><div class="duct-bar"><div class="grab-zone"></div><div class="target-dot" id="ct"></div></div><div class="timing-status" id="cs">3번 중 0번 성공</div><button class="puzzle-btn" id="cg">🥢 집기!</button><div class="puzzle-msg" id="cm"></div>';
+  const tgt=$('ct');
+  function tick(ts){
+    if(!running)return;
+    if(!lt)lt=ts;const dt=ts-lt;lt=ts;
+    pos+=dir*(dt/speed)*100;
+    if(pos>=94){pos=94;dir=-1}if(pos<=0){pos=0;dir=1}
+    if(tgt)tgt.style.left=pos+'%';
+    requestAnimationFrame(tick)}
+  $('cg').onclick=()=>{
+    if(!running)return;
+    const ok=pos>=33&&pos<=63;
+    const m=$('cm');
+    if(ok){successes++;playSuccess();
+      if(m){m.textContent='✅ 성공!';m.style.color='#5a5'}
+      if(successes>=3){running=false;GS.solved.chopstick=true;GS.inventory.push('metalFile');updateInvUI();
+        setTimeout(()=>{showNotif('🔧 환기구에서 날카로운 쇠줄을 꺼냈다!');closePuzzle()},700)}
+      else{speed=Math.max(800,speed*.72);const s=$('cs');if(s)s.textContent=`3번 중 ${successes}번 성공`;
+        setTimeout(()=>{if(m)m.textContent=''},700)}}
+    else{playError();if(m){m.textContent='❌ 놓쳤다! 다시!';m.style.color='#8b0000';setTimeout(()=>{if(m)m.textContent=''},1000)}}
+  };
+  puzzleCleanup=()=>{running=false};
+  requestAnimationFrame(tick);
+}
+
+// ========== PUZZLE 5: WALL CRACK ==========
+function pzWall(){
+  const el=puzzleContent;
+  const svgA='<svg viewBox="0 0 70 70" class="crack-svg"><line x1="8" y1="8" x2="62" y2="62" stroke="#c4956a" stroke-width="2"/><line x1="30" y1="30" x2="45" y2="22" stroke="#c4956a" stroke-width="1.5"/></svg>';
+  const svgB='<svg viewBox="0 0 70 70" class="crack-svg"><line x1="35" y1="8" x2="35" y2="62" stroke="#c4956a" stroke-width="2.2"/><line x1="35" y1="25" x2="16" y2="14" stroke="#c4956a" stroke-width="1.6"/><line x1="35" y1="25" x2="55" y2="13" stroke="#c4956a" stroke-width="1.6"/><line x1="35" y1="46" x2="18" y2="56" stroke="#c4956a" stroke-width="1.6"/><line x1="35" y1="46" x2="56" y2="52" stroke="#c4956a" stroke-width="1.6"/></svg>';
+  const svgC='<svg viewBox="0 0 70 70" class="crack-svg"><line x1="35" y1="35" x2="8" y2="10" stroke="#c4956a" stroke-width="1.5"/><line x1="35" y1="35" x2="62" y2="10" stroke="#c4956a" stroke-width="1.5"/><line x1="35" y1="35" x2="8" y2="60" stroke="#c4956a" stroke-width="1.5"/><line x1="35" y1="35" x2="62" y2="60" stroke="#c4956a" stroke-width="1.5"/><line x1="35" y1="35" x2="35" y2="5" stroke="#c4956a" stroke-width="1.5"/></svg>';
+  const svgD='<svg viewBox="0 0 70 70" class="crack-svg"><line x1="8" y1="20" x2="62" y2="22" stroke="#c4956a" stroke-width="1.5"/><line x1="12" y1="38" x2="58" y2="36" stroke="#c4956a" stroke-width="1.5"/><line x1="15" y1="54" x2="55" y2="55" stroke="#c4956a" stroke-width="1.5"/></svg>';
+  const refSvg='<svg viewBox="0 0 70 70" class="crack-svg" style="width:80px;height:80px"><line x1="35" y1="8" x2="35" y2="62" stroke="#d4a574" stroke-width="2.5"/><line x1="35" y1="25" x2="16" y2="14" stroke="#d4a574" stroke-width="2"/><line x1="35" y1="25" x2="55" y2="13" stroke="#d4a574" stroke-width="2"/><line x1="35" y1="46" x2="18" y2="56" stroke="#d4a574" stroke-width="2"/><line x1="35" y1="46" x2="56" y2="52" stroke="#d4a574" stroke-width="2"/></svg>';
+  const pats=[{svg:svgA,lbl:'A 패턴'},{svg:svgB,lbl:'B 패턴'},{svg:svgC,lbl:'C 패턴'},{svg:svgD,lbl:'D 패턴'}];
+  el.innerHTML=`<div class="puzzle-title">⚒️ 벽 파괴</div><div class="puzzle-desc">사진 속 균열 패턴과 일치하는 벽을 골라 망치로 부숴라</div>
+    <div class="photo-ref"><div style="color:#6b5b4a;font-size:.78rem;margin-bottom:.4rem">📸 사진 속 균열 패턴</div>${refSvg}</div>
+    <div class="crack-grid" id="cg"></div><div class="puzzle-msg" id="wm"></div>`;
+  const grid=$('cg');
+  pats.forEach((p,i)=>{
+    const opt=document.createElement('div');opt.className='crack-option';
+    opt.innerHTML=p.svg+'<div class="label">'+p.lbl+'</div>';
+    opt.onclick=()=>{
+      if(i===1){opt.classList.add('correct');playBreak();playSuccess();GS.solved.wall=true;
+        const m=$('wm');if(m){m.textContent='💥 벽이 무너진다...!';m.style.color='#d4a574'}
+        grid.querySelectorAll('.crack-option').forEach(o=>o.style.pointerEvents='none');
+        setTimeout(()=>{closePuzzle();doVictory()},1500)}
+      else{opt.classList.add('wrong');playError();
+        const m=$('wm');if(m){m.textContent='❌ 이 부분은 너무 단단하다...';m.style.color='#8b0000'}
+        setTimeout(()=>{opt.classList.remove('wrong');const m=$('wm');if(m)m.textContent=''},1500)}
+    };grid.appendChild(opt)});
+}
+
+// ========== PHOTO VIEWER ==========
+function pzPhoto(){
+  const ref='<svg viewBox="0 0 70 70" class="crack-svg" style="width:90px;height:90px"><line x1="35" y1="8" x2="35" y2="62" stroke="#d4a574" stroke-width="2.5"/><line x1="35" y1="25" x2="16" y2="14" stroke="#d4a574" stroke-width="2"/><line x1="35" y1="25" x2="55" y2="13" stroke="#d4a574" stroke-width="2"/><line x1="35" y1="46" x2="18" y2="56" stroke="#d4a574" stroke-width="2"/><line x1="35" y1="46" x2="56" y2="52" stroke="#d4a574" stroke-width="2"/></svg>';
+  puzzleContent.innerHTML=`<div class="puzzle-title">📸 낡은 사진</div><div class="puzzle-desc">서랍에서 발견한 바랜 폴라로이드 사진</div>
+    <div class="photo-ref" style="padding:1.2rem"><p style="color:#6b5b4a;margin-bottom:.8rem;line-height:1.7">사진 속에 벽의 일부가 찍혀 있다.<br>중앙에서 가지처럼 퍼지는 균열이 선명하다.</p>${ref}
+    <p style="color:#8b0000;font-size:.82rem;margin-top:.8rem">이 균열... 이 방 어딘가에도 있을 것 같다</p></div>`;
+}
+
+// ==================== GAME FLOW ====================
+function startIntro(){
+  ensureAudio();titleScreen.classList.add('hidden');introScreen.classList.remove('hidden');
+  const ps=introScreen.querySelectorAll('p');
+  ps.forEach((p,i)=>setTimeout(()=>p.classList.add('visible'),i*800+400));
+  setTimeout(()=>{introScreen.style.cursor='pointer';introScreen._ready=true},ps.length*800+800);
+}
+function startGame(){
+  introScreen.classList.add('hidden');gameUI.style.display='block';GS.phase='playing';
+  GS.interval=setInterval(updateTimerUI,1000);startAmbient();
+}
+function doVictory(){
+  GS.phase='victory';clearInterval(GS.interval);
+  const flash=new THREE.PointLight(0xffffff,1.5,15);flash.position.set(2.5,1.5,1.2);scene.add(flash);
+  const grow=setInterval(()=>{if(flash.intensity<7)flash.intensity+=.15;else clearInterval(grow)},16);
+  setTimeout(()=>{
+    gameUI.style.display='none';
+    const el=900-GS.timer,m=Math.floor(el/60),s=el%60;
+    $('escape-time').textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    victoryScreen.classList.remove('hidden');
+  },2500);
+}
+function doGameOver(){
+  GS.phase='gameover';clearInterval(GS.interval);
+  renderer.toneMappingExposure=.2;
+  setTimeout(()=>{gameUI.style.display='none';gameoverScreen.classList.remove('hidden')},1200);
+}
+
+// ==================== ANIMATION LOOP ====================
+const clock=new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const t=clock.getElapsedTime();
+  if(particles){
+    const p=particles.geometry.attributes.position.array;
+    for(let i=0;i<p.length;i+=3){p[i+1]+=Math.sin(t*.3+i)*.00025;p[i]+=Math.cos(t*.2+i)*.0001;if(p[i+1]>2.5)p[i+1]=.2}
+    particles.geometry.attributes.position.needsUpdate=true}
+  if(lightFixture){
+    const flick=Math.sin(t*37)>.96?.15:0;
+    lightFixture.material.emissiveIntensity=.5+Math.sin(t*1.8)*.08-flick}
+  if(GS.solved.tv&&tvScreenMesh)tvScreenMesh.material.emissiveIntensity=.25+Math.sin(t*1.5)*.06;
+  updateHover();
+  renderer.render(scene,camera);
+}
+
+// ==================== EVENTS ====================
+addEventListener('mousemove',e=>{
+  mouseX=e.clientX;mouseY=e.clientY;
+  mouse.x=(e.clientX/innerWidth)*2-1;mouse.y=-(e.clientY/innerHeight)*2+1;
+  if(GS.dragging&&GS.phase==='playing'&&!GS.puzzleOpen){
+    if(Math.abs(e.movementX)>0||Math.abs(e.movementY)>0)GS.dragMoved=true;
+    GS.yaw+=e.movementX*.003;GS.pitch+=e.movementY*.003;
+    GS.pitch=Math.max(-.55,Math.min(.35,GS.pitch));
+    camera.rotation.y=GS.yaw;camera.rotation.x=GS.pitch}
+});
+addEventListener('mousedown',e=>{if(e.button===0){GS.dragging=true;GS.dragMoved=false;GS.downX=e.clientX;GS.downY=e.clientY}});
+addEventListener('mouseup',e=>{if(e.button===0){const d=GS.dragMoved;GS.dragging=false;if(!d)handleClick()}});
+let touchMoved=false;
+addEventListener('touchstart',e=>{
+  if(e.touches.length===1){const t=e.touches[0];touchMoved=false;
+    mouse.x=(t.clientX/innerWidth)*2-1;mouse.y=-(t.clientY/innerHeight)*2+1;
+    GS.dragging=true;GS.downX=t.clientX;GS.downY=t.clientY}
+},{passive:true});
+addEventListener('touchmove',e=>{
+  if(e.touches.length===1&&GS.phase==='playing'&&!GS.puzzleOpen){
+    const t=e.touches[0];
+    if(Math.abs(t.clientX-GS.downX)>3||Math.abs(t.clientY-GS.downY)>3)touchMoved=true;
+    GS.yaw+=(t.clientX-GS.downX)*.004;GS.pitch+=(t.clientY-GS.downY)*.004;
+    GS.pitch=Math.max(-.55,Math.min(.35,GS.pitch));
+    camera.rotation.y=GS.yaw;camera.rotation.x=GS.pitch;
+    GS.downX=t.clientX;GS.downY=t.clientY;
+    mouse.x=(t.clientX/innerWidth)*2-1;mouse.y=-(t.clientY/innerHeight)*2+1}
+},{passive:true});
+addEventListener('touchend',()=>{GS.dragging=false;if(!touchMoved)handleClick()});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+$('puzzle-close').onclick=closePuzzle;
+$('start-btn').onclick=startIntro;
+$('mute-btn').onclick=toggleMute;
+$('replay-btn').onclick=()=>location.reload();
+$('retry-btn').onclick=()=>location.reload();
+introScreen.onclick=function(){if(introScreen._ready)startGame()};
+
+// ==================== INIT ====================
+buildRoom();buildObjects();buildLights();buildParticles();animate();
+
+})();
+</script>
+</body>
+</html>
